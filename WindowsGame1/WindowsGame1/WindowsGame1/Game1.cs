@@ -101,12 +101,20 @@ namespace WindowsGame1
         private float sceletonThickness = 5.0f;
 
         // ALEXANDER // Retriving the connected Kinect-sensor
-        KinectSensor sensor = KinectSensor.KinectSensors[0];
+        KinectSensor sensor;
 
         GameObject gameObject, half1, half2;       
 
         public Game1()
         {
+
+            if (KinectSensor.KinectSensors.Count == 0)
+            {
+                Console.WriteLine("No Kinect Connected!");
+                Environment.Exit(0);
+            }
+            sensor = KinectSensor.KinectSensors[0];
+
             graphics = new GraphicsDeviceManager(this);
             skeleton = new Skeleton[sensor.SkeletonStream.FrameSkeletonArrayLength];
 
@@ -155,7 +163,7 @@ namespace WindowsGame1
             cameraTexture = new RenderTarget2D(this.GraphicsDevice, 640, 480);
             colorSwapEffect = Content.Load<Effect>("ColorSwapEffect");
             //gameObject = new GameObject(-20.0f, resolutionYtotal / 2, 7.0f, -10.0f);
-            RestartGameObjects();
+            RestartFruit();
         }
 
         /// <summary>
@@ -241,7 +249,7 @@ namespace WindowsGame1
             }
             if (gameObject.Y_pos > resolutionYtotal + gameObject.Radius)
             {
-                RestartGameObjects();
+                RestartFruit();
             }
                 
 
@@ -398,21 +406,8 @@ namespace WindowsGame1
                     (gameObject.Y_pos) > Math.Min(i1.Y, i2.Y + i2.Y - i1.Y) &&
                     (gameObject.Y_pos) < Math.Max(i1.Y, i2.Y + i2.Y - i1.Y))
                 {
-                    // here init halfs!
-                    half1 = new GameObject(resolutionXtotal, resolutionYtotal, rnd);
-                    half1.X_pos = gameObject.X_pos;
-                    half1.Y_pos = gameObject.Y_pos;
-                    half1.X_speed = gameObject.X_speed + 2;
-                    half1.Y_speed = gameObject.Y_speed;
-                    half1.Radius = gameObject.Radius / 2;
-                    half2 = new GameObject(resolutionXtotal, resolutionYtotal, rnd);
-                    half2.X_pos = gameObject.X_pos;
-                    half2.Y_pos = gameObject.Y_pos;
-                    half2.X_speed = gameObject.X_speed - 2;
-                    half2.Y_speed = gameObject.Y_speed;
-                    half2.Radius = gameObject.Radius / 2;
-
-                    RestartGameObjects();
+                    RestartHalfs();
+                    RestartFruit();
                 }
             }
             else
@@ -424,9 +419,26 @@ namespace WindowsGame1
             
         }
 
-        private void RestartGameObjects()
+        private void RestartFruit()
         {
             gameObject = new GameObject(resolutionXtotal, resolutionYtotal, rnd);
+            GC.Collect();
+        }
+
+        private void RestartHalfs()
+        {
+            half1 = new GameObject(resolutionXtotal, resolutionYtotal, rnd);
+            half1.X_pos = gameObject.X_pos;
+            half1.Y_pos = gameObject.Y_pos;
+            half1.X_speed = gameObject.X_speed + (float)(rnd.NextDouble()) * rnd.Next(-1, 2) + 2;
+            half1.Y_speed = gameObject.Y_speed + (float)(rnd.NextDouble()) * rnd.Next(-1, 2);
+            half1.Radius = gameObject.Radius / 2;
+            half2 = new GameObject(resolutionXtotal, resolutionYtotal, rnd);
+            half2.X_pos = gameObject.X_pos;
+            half2.Y_pos = gameObject.Y_pos;
+            half2.X_speed = gameObject.X_speed + (float)(rnd.NextDouble()) * rnd.Next(-1, 2) - 2;
+            half2.Y_speed = gameObject.Y_speed + (float)(rnd.NextDouble()) * rnd.Next(-1, 2);
+            half2.Radius = gameObject.Radius / 2;
             GC.Collect();
         }
 
