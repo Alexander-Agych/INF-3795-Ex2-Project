@@ -20,8 +20,6 @@ namespace WindowsGame1
     /// </summary>
     /// 
 
-
-
     class GameObject
     {
         public float X_pos, Y_pos, X_speed, Y_speed, Radius;
@@ -50,7 +48,7 @@ namespace WindowsGame1
                 {
                     X_speed = rnd.Next(2, 4) + (float)(rnd.NextDouble());
                 }
-                Y_speed = -rnd.Next(12, 14) - (float)(rnd.NextDouble());
+                Y_speed = -rnd.Next(11, 13) - (float)(rnd.NextDouble());
             }
             else
             {
@@ -59,11 +57,11 @@ namespace WindowsGame1
                 for (X_pos = resolutionXtotal / 2; X_pos == resolutionXtotal / 2; X_pos = resolutionXtotal / 2 + (resolutionXtotal / 2 + Radius) * rnd.Next(-1, 2)) ;
                 if (X_pos > 0)
                 {
-                    X_speed = -rnd.Next(3, 6) - (float)(rnd.NextDouble());
+                    X_speed = -rnd.Next(4, 6) - (float)(rnd.NextDouble());
                 }
                 else
                 {
-                    X_speed = rnd.Next(3, 6) + (float)(rnd.NextDouble());
+                    X_speed = rnd.Next(4, 6) + (float)(rnd.NextDouble());
                 }
                 if (Y_pos > resolutionYtotal / 2)
                 {
@@ -73,11 +71,23 @@ namespace WindowsGame1
                 else
                 {
                     Y_pos = resolutionYtotal / 4;
-                    Y_speed = -rnd.Next(1, 4);
-                    X_speed *= (float)(1 + rnd.NextDouble() / 2);
+                    Y_speed = -rnd.Next(4, 6) - (float)(rnd.NextDouble());
+                    X_speed *= 0.75f + (float)(rnd.NextDouble() / 2);
                 }
                 
             }
+        }
+    }
+
+
+    class GameObjectCollection
+    {
+        public GameObject full, half1, half2;
+        public GameObjectCollection(int resolutionXtotal, int resolutionYtotal, Random rnd)
+        {
+            full = new GameObject(resolutionXtotal, resolutionYtotal, rnd);
+            half1 = null;
+            half2 = null;
         }
     }
 
@@ -100,14 +110,17 @@ namespace WindowsGame1
         private float gravity = 0.15f;
         private float sceletonThickness = 5.0f;
 
-        // ALEXANDER // Retriving the connected Kinect-sensor
-        KinectSensor sensor;
+        private KinectSensor sensor;
 
-        GameObject gameObject, half1, half2;       
+        private GameObjectCollection[] goc;
+
+        private int maxNumGameObjects = 3;
+        private int numGameObjects;
 
         public Game1()
         {
 
+            // ALEXANDER // Retriving the connected Kinect-sensor
             if (KinectSensor.KinectSensors.Count == 0)
             {
                 Console.WriteLine("No Kinect Connected!");
@@ -163,7 +176,8 @@ namespace WindowsGame1
             cameraTexture = new RenderTarget2D(this.GraphicsDevice, 640, 480);
             colorSwapEffect = Content.Load<Effect>("ColorSwapEffect");
             //gameObject = new GameObject(-20.0f, resolutionYtotal / 2, 7.0f, -10.0f);
-            RestartFruit();
+            goc = new GameObjectCollection[maxNumGameObjects];
+            RestartCollection();
         }
 
         /// <summary>
@@ -227,34 +241,48 @@ namespace WindowsGame1
                 }
             }
 
-            gameObject.Y_speed += gravity;
-            gameObject.X_pos += gameObject.X_speed;
-            gameObject.Y_pos += gameObject.Y_speed;
-            if(half1 != null && half2 != null)
+            for (int i = 0; i < numGameObjects; i++)
             {
-                half1.Y_speed += gravity;
-                half1.X_pos += half1.X_speed;
-                half1.Y_pos += half1.Y_speed;
-                half2.Y_speed += gravity;
-                half2.X_pos += half2.X_speed;
-                half2.Y_pos += half2.Y_speed;
-                if (half1.Y_pos > resolutionYtotal + half1.Radius)
+                if (goc[i] != null)
                 {
-                    half1 = null;
+                    if (goc[i] != null && goc[i].full != null)
+                    {
+                        goc[i].full.Y_speed += gravity;
+                        goc[i].full.X_pos += goc[i].full.X_speed;
+                        goc[i].full.Y_pos += goc[i].full.Y_speed;
+                        if (goc[i].full.Y_pos > resolutionYtotal + goc[i].full.Radius)
+                        {
+                            goc[i].full = null;
+                        }
+                    }
+                    else if (goc[i].half1 != null && goc[i].half2 != null)
+                    {
+                        goc[i].half1.Y_speed += gravity;
+                        goc[i].half1.X_pos += goc[i].half1.X_speed;
+                        goc[i].half1.Y_pos += goc[i].half1.Y_speed;
+                        goc[i].half2.Y_speed += gravity;
+                        goc[i].half2.X_pos += goc[i].half2.X_speed;
+                        goc[i].half2.Y_pos += goc[i].half2.Y_speed;
+                        if (goc[i].half1.Y_pos > resolutionYtotal + goc[i].half1.Radius)
+                        {
+                            goc[i].half1 = null;
+                        }
+                        if (goc[i].half2.Y_pos > resolutionYtotal + goc[i].half2.Radius)
+                        {
+                            goc[i].half2 = null;
+                        }
+                    }   
+                    else
+                    {
+                        goc[i] = null;
+                    }
                 }
-                if (half2.Y_pos > resolutionYtotal + half2.Radius)
+                if(!CheckIfEmpty())
                 {
-                    half2 = null;
+                    RestartCollection();
                 }
             }
-            if (gameObject.Y_pos > resolutionYtotal + gameObject.Radius)
-            {
-                RestartFruit();
-            }
-                
-
             base.Update(gameTime);
-
         }
 
         /// <summary>
@@ -287,11 +315,20 @@ namespace WindowsGame1
                 }
             }
 
-            spriteBatch.DrawCircle(gameObject.X_pos, gameObject.Y_pos, gameObject.Radius, 20, Color.Black, 20);
-            if(half1 != null && half2 != null)
+            for (int a = 0; a < numGameObjects; a++)
             {
-                spriteBatch.DrawCircle(half1.X_pos, half1.Y_pos, half1.Radius, 3, Color.Yellow, 20);
-                spriteBatch.DrawCircle(half2.X_pos, half2.Y_pos, half2.Radius, 3, Color.Yellow, 20);
+                if(goc[a] != null)
+                {
+                    if (goc[a].full != null)
+                    {
+                        spriteBatch.DrawCircle(goc[a].full.X_pos, goc[a].full.Y_pos, goc[a].full.Radius, 20, Color.Black, 20);
+                    }
+                    if (goc[a].half1 != null && goc[a].half2 != null)
+                    {
+                        spriteBatch.DrawCircle(goc[a].half1.X_pos, goc[a].half1.Y_pos, goc[a].half1.Radius, 3, Color.Yellow, 20);
+                        spriteBatch.DrawCircle(goc[a].half2.X_pos, goc[a].half2.Y_pos, goc[a].half2.Radius, 3, Color.Yellow, 20);
+                    }
+                }
             }
             base.Draw(gameTime);
             spriteBatch.End();
@@ -368,6 +405,7 @@ namespace WindowsGame1
             ColorImagePoint i1;
             ColorImagePoint i2;
             float thickness_factor = 1.0f;
+            float sx, sy;
 
             if (jointFrom.TrackingState == JointTrackingState.Inferred ||
             jointTo.TrackingState == JointTrackingState.Inferred)
@@ -400,14 +438,36 @@ namespace WindowsGame1
                 (jointFrom.JointType.Equals(JointType.ElbowRight) && jointTo.JointType.Equals(JointType.WristRight)))
             {
                 c = Color.Red;
+
+                /*
+                sx = i2.X + i2.X - i1.X;
+                if (sx < i1.X)
+                    sx = i1.X + resolutionXtotal / 10;
+                else
+                    sx = i1.X - resolutionXtotal / 10;
+                sy = i2.Y + i2.Y - i1.Y;
+                if (sx < i1.Y)
+                    sy = i1.Y + resolutionYtotal / 10;
+                else
+                    sy = i1.Y - resolutionYtotal / 10;
+                spriteBatch.DrawLine(i1.X, i1.Y, sx, sy, c, sceletonThickness / 2 * thickness_factor);
+                */
+
                 spriteBatch.DrawLine(i1.X, i1.Y, i2.X + i2.X - i1.X, i2.Y + i2.Y - i1.Y, c, sceletonThickness / 2 * thickness_factor);
-                if((gameObject.X_pos) > Math.Min(i1.X, i2.X + i2.X - i1.X) &&
-                    (gameObject.X_pos) < Math.Max(i1.X, i2.X + i2.X - i1.X) &&
-                    (gameObject.Y_pos) > Math.Min(i1.Y, i2.Y + i2.Y - i1.Y) &&
-                    (gameObject.Y_pos) < Math.Max(i1.Y, i2.Y + i2.Y - i1.Y))
+                
+                for (int a = 0; a < numGameObjects; a++)
                 {
-                    RestartHalfs();
-                    RestartFruit();
+                    if(goc[a] != null && goc[a].full != null)
+                    {
+                        if ((goc[a].full.X_pos) > Math.Min(i1.X, i2.X + i2.X - i1.X) &&
+                            (goc[a].full.X_pos) < Math.Max(i1.X, i2.X + i2.X - i1.X) &&
+                            (goc[a].full.Y_pos) > Math.Min(i1.Y, i2.Y + i2.Y - i1.Y) &&
+                            (goc[a].full.Y_pos) < Math.Max(i1.Y, i2.Y + i2.Y - i1.Y))
+                        {
+                            BeginHalfs(goc[a]);
+                            goc[a].full = null;
+                        }
+                    }
                 }
             }
             else
@@ -419,26 +479,50 @@ namespace WindowsGame1
             
         }
 
-        private void RestartFruit()
+        /*
+        private void RestartFruit(GameObjectCollection oc)
         {
-            gameObject = new GameObject(resolutionXtotal, resolutionYtotal, rnd);
+            oc.full = new GameObject(resolutionXtotal, resolutionYtotal, rnd);
+            GC.Collect();
+        }
+        */
+
+        private void BeginHalfs(GameObjectCollection oc)
+        {
+            oc.half1 = new GameObject(resolutionXtotal, resolutionYtotal, rnd);
+            oc.half1.X_pos = oc.full.X_pos;
+            oc.half1.Y_pos = oc.full.Y_pos;
+            oc.half1.X_speed = oc.full.X_speed + (float)(rnd.NextDouble()) * rnd.Next(-1, 2) + 2;
+            oc.half1.Y_speed = oc.full.Y_speed + (float)(rnd.NextDouble()) * rnd.Next(-1, 2);
+            oc.half1.Radius = oc.full.Radius / 2;
+            oc.half2 = new GameObject(resolutionXtotal, resolutionYtotal, rnd);
+            oc.half2.X_pos = oc.full.X_pos;
+            oc.half2.Y_pos = oc.full.Y_pos;
+            oc.half2.X_speed = oc.full.X_speed + (float)(rnd.NextDouble()) * rnd.Next(-1, 2) - 2;
+            oc.half2.Y_speed = oc.full.Y_speed + (float)(rnd.NextDouble()) * rnd.Next(-1, 2);
+            oc.half2.Radius = oc.full.Radius / 2;
             GC.Collect();
         }
 
-        private void RestartHalfs()
+        private Boolean CheckIfEmpty()
         {
-            half1 = new GameObject(resolutionXtotal, resolutionYtotal, rnd);
-            half1.X_pos = gameObject.X_pos;
-            half1.Y_pos = gameObject.Y_pos;
-            half1.X_speed = gameObject.X_speed + (float)(rnd.NextDouble()) * rnd.Next(-1, 2) + 2;
-            half1.Y_speed = gameObject.Y_speed + (float)(rnd.NextDouble()) * rnd.Next(-1, 2);
-            half1.Radius = gameObject.Radius / 2;
-            half2 = new GameObject(resolutionXtotal, resolutionYtotal, rnd);
-            half2.X_pos = gameObject.X_pos;
-            half2.Y_pos = gameObject.Y_pos;
-            half2.X_speed = gameObject.X_speed + (float)(rnd.NextDouble()) * rnd.Next(-1, 2) - 2;
-            half2.Y_speed = gameObject.Y_speed + (float)(rnd.NextDouble()) * rnd.Next(-1, 2);
-            half2.Radius = gameObject.Radius / 2;
+            for (int i = 0; i < numGameObjects; i++)
+            {
+                if (goc[i] != null)
+                {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        private void RestartCollection()
+        {
+            numGameObjects = rnd.Next(1, maxNumGameObjects + 1);
+            for (int i = 0; i < numGameObjects; i++)
+            {
+                goc[i] = new GameObjectCollection(resolutionXtotal, resolutionYtotal, rnd);
+            }
             GC.Collect();
         }
 
