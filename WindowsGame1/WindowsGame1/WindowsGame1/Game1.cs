@@ -14,6 +14,8 @@ using Microsoft.Kinect;
 using System.Drawing.Imaging;
 using System.Runtime.InteropServices;
 using C3.XNA;
+using System.Diagnostics;// meskerem
+
 
 namespace WindowsGame1
 {
@@ -24,7 +26,7 @@ namespace WindowsGame1
 
     class GameObject
     {
-        public float X_pos, Y_pos, X_speed, Y_speed, Radius;
+        public float X_pos, Y_pos, X_speed, Y_speed, Radius, Rotation, Rotation_factor;
         public Texture2D Asset;
         //public GameObject(float x_pos, float y_pos, float x_speed, float y_speed)
         //{
@@ -36,7 +38,10 @@ namespace WindowsGame1
         public GameObject(int resolutionXtotal, int resolutionYtotal, Random rnd, Texture2D asset)
         //public void Init(int resolutionXtotal, int resolutionYtotal);
         {
-            Radius = 80;
+            float global_scale = (float)((float)resolutionYtotal / (float)600);
+            Radius = 80 * global_scale;
+            Rotation = rnd.Next(1, 100);
+            Rotation_factor = (float)((float)rnd.Next(1, 10) / 50 - (float)rnd.Next(1, 10) / 50);
             Asset = asset;
             Y_pos = rnd.Next(resolutionYtotal / 2, resolutionYtotal + resolutionYtotal / 2);
             if (Y_pos > resolutionYtotal)
@@ -46,13 +51,13 @@ namespace WindowsGame1
                 for (X_pos = resolutionXtotal / 2; X_pos == resolutionXtotal / 2; X_pos = resolutionXtotal / 2 + (resolutionXtotal / 3) * rnd.Next(-1, 2));
                 if (X_pos > resolutionXtotal / 2)
                 {
-                    X_speed = -rnd.Next(2, 4) - (float)(rnd.NextDouble());
+                    X_speed = (-rnd.Next(2, 4) - (float)(rnd.NextDouble())) * global_scale;
                 }
                 else
                 {
-                    X_speed = rnd.Next(2, 4) + (float)(rnd.NextDouble());
+                    X_speed = (rnd.Next(2, 4) + (float)(rnd.NextDouble())) * global_scale;
                 }
-                Y_speed = -rnd.Next(11, 13) - (float)(rnd.NextDouble());
+                Y_speed = (-rnd.Next(11, 13) - (float)(rnd.NextDouble())) * global_scale;
             }
             else
             {
@@ -61,21 +66,21 @@ namespace WindowsGame1
                 for (X_pos = resolutionXtotal / 2; X_pos == resolutionXtotal / 2; X_pos = resolutionXtotal / 2 + (resolutionXtotal / 2 + Radius) * rnd.Next(-1, 2)) ;
                 if (X_pos > 0)
                 {
-                    X_speed = -rnd.Next(4, 6) - (float)(rnd.NextDouble());
+                    X_speed = (-rnd.Next(4, 6) - (float)(rnd.NextDouble())) * global_scale;
                 }
                 else
                 {
-                    X_speed = rnd.Next(4, 6) + (float)(rnd.NextDouble());
+                    X_speed = (rnd.Next(4, 6) + (float)(rnd.NextDouble())) * global_scale;
                 }
                 if (Y_pos > resolutionYtotal / 2)
                 {
                     Y_pos = resolutionYtotal - resolutionYtotal / 4;
-                    Y_speed = -rnd.Next(9, 11) - (float)(rnd.NextDouble());
+                    Y_speed = (-rnd.Next(9, 11) - (float)(rnd.NextDouble())) * global_scale;
                 }
                 else
                 {
                     Y_pos = resolutionYtotal / 4;
-                    Y_speed = -rnd.Next(4, 6) - (float)(rnd.NextDouble());
+                    Y_speed = (-rnd.Next(4, 6) - (float)(rnd.NextDouble())) * global_scale;
                     X_speed *= 0.75f + (float)(rnd.NextDouble() / 2);
                 }
                 
@@ -104,30 +109,47 @@ namespace WindowsGame1
         private SpriteBatch spriteBatch;
         private RenderTarget2D cameraTexture;
         private Texture2D ninjaHead;
-        private Texture2D[] fruits;
+        private Texture2D[] fruits, fruit_halfs1, fruit_halfs2;
         private Texture2D background;
-        private String[] BG_set, NH_set, FR_set;
+        private String[] BG_set, NH_set, FR_set, FRhalfs_set1, FRhalfs_set2;
         private byte[] colorFrameData;
         private Effect colorSwapEffect;
         private static Random rnd = new Random();
 
         // 4:3 resolutions: 640 x 480 || 768 x 576 || 800 x 600 || 960 x 720 || 1024 x 768
-        // 4:3 resolutions: 1152 x 864 || 1280 x 960 || 1200 x 1600
-        private int resolutionXtotal = 800, resolutionYtotal = 600;
-
-        private float gravity = 0.15f;
-        private float sceletonThickness = 5.0f;
+        // 4:3 resolutions: 1152 x 864 || 1280 x 960 || 1600 x 1200
+        private int resolutionXtotal = Settings1.Default.resolutionX;
+        private int resolutionYtotal = Settings1.Default.resolutionY;
+        private float gravity;
+        private float sceletonThickness;
+        private bool full_scr = Settings1.Default.fullScreen;
+        private float global_scale;
 
         private KinectSensor sensor;
 
         private GameObjectCollection[] goc;
 
-        private int maxNumGameObjects = 4;
+        private int maxNumGameObjects = 4; 
         private int numGameObjects;
+
+
+        // Meskerem: variables
+        private int scorePoint = 0;      //holds the total number of scores during one game play
+        private int minScorePoint = Settings1.Default.minimumScore; //holds the minimum number of scores a player should score to make the game continue
+        private double oneGameDuration = Settings1.Default.gameDuration; //holds the default time of one game play in minutes
+        public Stopwatch stopWatch = new Stopwatch();
+        double elapsedTime;               //holds the time elapsed since the game started
+        private SpriteFont Font1;                 // holds the font type to display the score point  
+        private Vector2 FontPos;                  //holds the vector position of the score point  
+       // Runtime nui = new Runtime();
+        private SoundEffect slice;
+        private SoundEffectInstance soundEngineInstance;
+        private Song music;
+        private bool win = false;
 
         public Game1()
         {
-
+            
             // ALEXANDER // Retriving the connected Kinect-sensor
             if (KinectSensor.KinectSensors.Count == 0)
             {
@@ -139,6 +161,11 @@ namespace WindowsGame1
             graphics = new GraphicsDeviceManager(this);
             skeleton = new Skeleton[sensor.SkeletonStream.FrameSkeletonArrayLength];
 
+            if (full_scr == true || (resolutionYtotal > GraphicsAdapter.DefaultAdapter.CurrentDisplayMode.Height))
+            {
+                resolutionYtotal = GraphicsAdapter.DefaultAdapter.CurrentDisplayMode.Height;
+                resolutionXtotal = resolutionYtotal / 3 * 4;
+            }
             graphics.PreferredBackBufferWidth = resolutionXtotal;
             graphics.PreferredBackBufferHeight = resolutionYtotal;
             //graphics.ToggleFullScreen();
@@ -154,18 +181,32 @@ namespace WindowsGame1
             NH_set[1] = ".\\Content\\Assets\\Ninja\\ninja2.png";
             FR_set = new String[6];
             FR_set[0] = ".\\Content\\Assets\\Fruits\\banana-hd.png";
-            FR_set[1] = ".\\Content\\Assets\\Fruits\\bomb-hd.png";
+            FR_set[1] = ".\\Content\\Assets\\Fruits\\watermelon-hd.png";
             FR_set[2] = ".\\Content\\Assets\\Fruits\\grapes-hd.png";
             FR_set[3] = ".\\Content\\Assets\\Fruits\\pineapple-hd.png";
             FR_set[4] = ".\\Content\\Assets\\Fruits\\strawberry-hd.png";
-            FR_set[5] = ".\\Content\\Assets\\Fruits\\watermelon-hd.png";
+            FR_set[5] = ".\\Content\\Assets\\Fruits\\bomb-hd.png";
+            FRhalfs_set1 = new String[6];
+            FRhalfs_set1[0] = ".\\Content\\Assets\\Fruits\\banana-hd-half1.png";
+            FRhalfs_set1[1] = ".\\Content\\Assets\\Fruits\\watermelon-hd-half1.png";
+            FRhalfs_set1[2] = ".\\Content\\Assets\\Fruits\\grapes-hd-half1.png";
+            FRhalfs_set1[3] = ".\\Content\\Assets\\Fruits\\pineapple-hd-half1.png";
+            FRhalfs_set1[4] = ".\\Content\\Assets\\Fruits\\strawberry-hd-half1.png";
+            FRhalfs_set1[5] = "";
+            FRhalfs_set2 = new String[6];
+            FRhalfs_set2[0] = ".\\Content\\Assets\\Fruits\\banana-hd-half2.png";
+            FRhalfs_set2[1] = ".\\Content\\Assets\\Fruits\\watermelon-hd-half2.png";
+            FRhalfs_set2[2] = ".\\Content\\Assets\\Fruits\\grapes-hd-half2.png";
+            FRhalfs_set2[3] = ".\\Content\\Assets\\Fruits\\pineapple-hd-half2.png";
+            FRhalfs_set2[4] = ".\\Content\\Assets\\Fruits\\strawberry-hd-half2.png";
+            FRhalfs_set2[5] = "";
 
             // ALEXANDER // Ensure the sensor exists
             // ALEXANDER // Activating the video camera and setting it to return images in the format specified
             sensor.ColorStream.Enable(ColorImageFormat.RgbResolution640x480Fps30);
             sensor.SkeletonStream.Enable();
             sensor.Start();
-
+            this.graphics.IsFullScreen = full_scr; //Meskerem: make the game full screen
             //Show the cursor
             IsMouseVisible = true;
 
@@ -190,17 +231,50 @@ namespace WindowsGame1
         /// </summary>
         protected override void LoadContent()
         {
+
+            
+
+            global_scale = (float)((float)resolutionYtotal / (float)600);
+            Console.WriteLine(resolutionYtotal);
+            Console.WriteLine(resolutionXtotal);
+
+            gravity = 0.15f * global_scale;
+            sceletonThickness = 5.0f * global_scale;
+
             spriteBatch = new SpriteBatch(GraphicsDevice);
             cameraTexture = new RenderTarget2D(this.GraphicsDevice, 640, 480);
             colorSwapEffect = Content.Load<Effect>("ColorSwapEffect");
 
+            //Meskerem: score point display
+            Font1 = Content.Load<SpriteFont>("SpriteFont1");           
+            FontPos = new Vector2(graphics.GraphicsDevice.Viewport.Width / 2, graphics.GraphicsDevice.Viewport.Height / 20 );
+            //
+            //meskerem: backgrond music 
+            //soundEngine = Content.Load<SoundEffect>("Audio\\slice1");//
+            //soundEngineInstance = soundEngine.CreateInstance();
+            music = Content.Load<Song>("Audio\\background1");
+            slice = Content.Load<SoundEffect>("Audio\\slice1");
+            soundEngineInstance = slice.CreateInstance();
+            if (Settings1.Default.enableMusic)
+            {
+                MediaPlayer.IsRepeating = true;
+                MediaPlayer.Volume = (float)0.4;
+                MediaPlayer.Play(music);
+            }
+
+            //
+            //Meskerem:end
             //background = Content.Load<Texture2D>("Assets/Backgrounds/background1.jpg");
             background = Texture2D.FromStream(GraphicsDevice, File.OpenRead(BG_set[rnd.Next(0, 3)]));
             ninjaHead = Texture2D.FromStream(GraphicsDevice, File.OpenRead(NH_set[rnd.Next(0, 2)]));
             fruits = new Texture2D[6];
-            for (int i = 0; i < 6; i++)
+            fruit_halfs1 = new Texture2D[6];
+            fruit_halfs2 = new Texture2D[6];
+            for (int i = 0; i < 5; i++)
             {
                 fruits[i] = Texture2D.FromStream(GraphicsDevice, File.OpenRead(FR_set[i]));
+                fruit_halfs1[i] = Texture2D.FromStream(GraphicsDevice, File.OpenRead(FRhalfs_set1[i]));
+                fruit_halfs2[i] = Texture2D.FromStream(GraphicsDevice, File.OpenRead(FRhalfs_set2[i]));
             }
 
             goc = new GameObjectCollection[maxNumGameObjects];
@@ -221,6 +295,7 @@ namespace WindowsGame1
                 sensor.Dispose();
             }
             */
+            MediaPlayer.Stop();
             GC.Collect();
         }
 
@@ -233,8 +308,9 @@ namespace WindowsGame1
         /// <param name="gameTime">Provides a snapshot of timing values.</param>
         protected override void Update(GameTime gameTime)
         {
+            //Meskerem: this block is only needed for game controller
             // Allows the game to exit
-            if (GamePad.GetState(PlayerIndex.One).Buttons.Back == ButtonState.Pressed)
+           /* if (GamePad.GetState(PlayerIndex.One).Buttons.Back == ButtonState.Pressed)
             {
                 if (sensor != null)
                 {
@@ -242,7 +318,7 @@ namespace WindowsGame1
                     sensor.Dispose();
                 }
                 this.Exit();
-            }
+            }*/
 
             // TODO: Add your update logic here
 
@@ -278,6 +354,7 @@ namespace WindowsGame1
                         goc[i].full.Y_speed += gravity;
                         goc[i].full.X_pos += goc[i].full.X_speed;
                         goc[i].full.Y_pos += goc[i].full.Y_speed;
+                        goc[i].full.Rotation += goc[i].full.Rotation_factor;
                         if (goc[i].full.Y_pos > resolutionYtotal + goc[i].full.Radius)
                         {
                             goc[i].full = null;
@@ -288,14 +365,16 @@ namespace WindowsGame1
                         goc[i].half1.Y_speed += gravity;
                         goc[i].half1.X_pos += goc[i].half1.X_speed;
                         goc[i].half1.Y_pos += goc[i].half1.Y_speed;
+                        goc[i].half1.Rotation += goc[i].half1.Rotation_factor;
                         goc[i].half2.Y_speed += gravity;
                         goc[i].half2.X_pos += goc[i].half2.X_speed;
                         goc[i].half2.Y_pos += goc[i].half2.Y_speed;
-                        if (goc[i].half1.Y_pos > resolutionYtotal + goc[i].half1.Radius)
+                        goc[i].half2.Rotation += goc[i].half2.Rotation_factor;
+                        if (goc[i].half1.Y_pos > resolutionYtotal + goc[i].half1.Radius * 2)
                         {
                             goc[i].half1 = null;
                         }
-                        if (goc[i].half2.Y_pos > resolutionYtotal + goc[i].half2.Radius)
+                        if (goc[i].half2.Y_pos > resolutionYtotal + goc[i].half2.Radius * 2)
                         {
                             goc[i].half2 = null;
                         }
@@ -305,30 +384,112 @@ namespace WindowsGame1
                         goc[i] = null;
                     }
                 }
-                if(!CheckIfEmpty())
+                
+                //meskerem: backgrond music
+                            //soundEngineInstance.Volume = 0.75f;
+                           //soundEngineInstance.IsLooped = true;
+                           // soundEngineInstance.Play();
+                            //MediaPlayer.Play(music);
+                                                       
+                GameStatus();// Meskerem: Game status method called
+
+                if (!CheckIfEmpty())
                 {
                     RestartCollection();
                 }
             }
+//////////////
+            GamePadState gamePadState = GamePad.GetState(PlayerIndex.One);
+            KeyboardState keyboardState = Keyboard.GetState();
+
+            // Check to see if the user has exited
+            if (checkExitKey(keyboardState, gamePadState))
+            {
+                //base.Update(gameTime);
+                return;
+            }
             base.Update(gameTime);
         }
 
-        /// <summary>
-        /// This is called when the game should draw itself.
-        /// </summary>
-        /// <param name="gameTime">Provides a snapshot of timing values.</param>
+
+
+        ////meskere:methods
+        public void GameStatus() //calculates time elapsed since the game started and compare
+        {
+            elapsedTime = stopWatch.ElapsedMilliseconds / 1000;
+           
+            //int elapsedTime = Convert.ToInt32(elapsedTime);
+            if (elapsedTime >= oneGameDuration * 60)
+            {
+                if(scorePoint >= minScorePoint)
+                {
+                    win = true;
+                    oneGameDuration += 1.0;
+                    minScorePoint += 100;
+                }
+                else
+                {
+                    this.Exit();
+                }
+            }
+        }
+
+
+        bool checkExitKey(KeyboardState keyboardState, GamePadState gamePadState)
+        {
+            // Check to see whether ESC was pressed on the keyboard 
+           
+            if (keyboardState.IsKeyDown(Keys.Escape))
+            {
+                Exit();
+                return true;
+            }
+            return false;
+        }
+        
+        //End of methods
+          
+
+       
+
+
         protected override void Draw(GameTime gameTime)
         {
 
             spriteBatch.Begin();
 
-            GraphicsDevice.Clear(Color.SkyBlue);
+            //GraphicsDevice.Clear(Color.SkyBlue); //Meskerem: it is not used anymore
             spriteBatch.Draw(background, Vector2.Zero, null, Color.White, 0f, Vector2.Zero, (float)resolutionYtotal / (float)background.Height, SpriteEffects.None, 0f);
             //spriteBatch.Begin(SpriteSortMode.Immediate, null, null, null, null, colorSwapEffect);
             float colorFrameScale = 0.25f + 0.25f * (resolutionYtotal / 480.0f - 1);
             ColorImagePoint i;
-            spriteBatch.Draw(cameraTexture, Vector2.Zero, null, Color.White, 0f, Vector2.Zero, colorFrameScale, SpriteEffects.None, 0f);
+            string output;
 
+            if(Settings1.Default.showColorCamera)
+            {
+                spriteBatch.Draw(cameraTexture, Vector2.Zero, null, Color.White, 0f, Vector2.Zero, colorFrameScale, SpriteEffects.None, 0f);
+            }
+
+            //Meskerem: display the score point
+            GraphicsDevice.Clear(Color.CornflowerBlue);                
+            // Draw display text
+            if (!win)
+            {
+                output = "Score: " + scorePoint + "  Time: " + ((int)(elapsedTime / 60)).ToString() + " min, " + ((int)(elapsedTime % 60)).ToString() + " sec";
+            }
+            else
+            {
+                output = "!WIN! Score: " + scorePoint + " Time: " + Settings1.Default.gameDuration.ToString() + " min  !WIN!";
+            }
+
+            // Find the center of the string
+            Vector2 FontOrigin = Font1.MeasureString(output) / 2;
+            // Draw the score value
+            spriteBatch.DrawString(Font1, output, FontPos, Color.White, 0, FontOrigin, 1.0f * global_scale, SpriteEffects.None, 0.5f);
+            //// End of Meskerem
+            
+            
+            //
             foreach (Skeleton sk in this.skeleton)
             {
                 if (sk != null)
@@ -355,15 +516,24 @@ namespace WindowsGame1
                         Vector2 v = new Vector2(goc[a].full.X_pos - (float)goc[a].full.Asset.Width * scale / 2,
                             goc[a].full.Y_pos - (float)goc[a].full.Asset.Height * scale / 2);
                         //spriteBatch.DrawCircle(goc[a].full.X_pos, goc[a].full.Y_pos, goc[a].full.Radius, 20, Color.Black, 20);
-                        spriteBatch.Draw(goc[a].full.Asset, v, null, Color.White, 0f, Vector2.Zero, scale, SpriteEffects.None, 0f);
+                        spriteBatch.Draw(goc[a].full.Asset, v, null, Color.White, goc[a].full.Rotation, new Vector2(goc[a].full.Asset.Width / 2, goc[a].full.Asset.Height / 2), scale, SpriteEffects.None, 0f);
                     }
                     if (goc[a].half1 != null)
                     {
-                        spriteBatch.DrawCircle(goc[a].half1.X_pos, goc[a].half1.Y_pos, goc[a].half1.Radius / 2, 3, Color.Yellow, 20);
+                        //spriteBatch.DrawCircle(goc[a].half1.X_pos, goc[a].half1.Y_pos, goc[a].half1.Radius / 2, 3, Color.Yellow, 20);
+                        float scale = (float)goc[a].half1.Radius / (float)goc[a].half1.Asset.Height;
+                        Vector2 v = new Vector2(goc[a].half1.X_pos - (float)goc[a].half1.Asset.Width * scale / 2,
+                            goc[a].half1.Y_pos - (float)goc[a].half1.Asset.Height * scale / 2);
+                        spriteBatch.Draw(goc[a].half1.Asset, v, null, Color.White, goc[a].half1.Rotation, new Vector2(goc[a].half1.Asset.Width / 2, goc[a].half1.Asset.Height / 2), scale, SpriteEffects.None, 0f);
                     }
                     if (goc[a].half2 != null)
                     {
-                        spriteBatch.DrawCircle(goc[a].half2.X_pos, goc[a].half2.Y_pos, goc[a].half2.Radius / 2, 3, Color.Yellow, 20);
+                        //spriteBatch.DrawCircle(goc[a].half2.X_pos, goc[a].half2.Y_pos, goc[a].half2.Radius / 2, 3, Color.Yellow, 20);
+                        //Console.WriteLine((float)goc[a].half2.Asset.Height);
+                        float scale = (float)goc[a].half2.Radius / (float)goc[a].half2.Asset.Height;
+                        Vector2 v = new Vector2(goc[a].half2.X_pos - (float)goc[a].half2.Asset.Width * scale / 2,
+                            goc[a].half2.Y_pos - (float)goc[a].half2.Asset.Height * scale / 2);
+                        spriteBatch.Draw(goc[a].half2.Asset, v, null, Color.White, goc[a].half2.Rotation, new Vector2(goc[a].half2.Asset.Width / 2, goc[a].half2.Asset.Height / 2), scale, SpriteEffects.None, 0f);
                     }
                 }
             }
@@ -383,7 +553,7 @@ namespace WindowsGame1
             DrawBone(jointCollection[JointType.ShoulderCenter], jointCollection[JointType.ShoulderRight]);
             i = SkeletonCoordinatesScaleAndTranslate((jointCollection[JointType.Head]).Position.X, (jointCollection[JointType.Head]).Position.Y);
             //Vector2 v = new Vector2(i.X - sceletonThickness / 2, i.Y);
-            float headscale = (float)ninjaHead.Height / (float)resolutionYtotal;
+            float headscale = (float)global_scale / (float)3;
             Vector2 v = new Vector2(i.X - (float)ninjaHead.Width * headscale / 2, i.Y - (float)ninjaHead.Height * headscale / 2);
             //spriteBatch.DrawCircle(i.X - sceletonThickness / 2, i.Y, sceletonThickness * 4, (int)(sceletonThickness * 4), Color.White, sceletonThickness * 4);
             spriteBatch.Draw(ninjaHead, v, null, Color.White, 0f, Vector2.Zero, headscale, SpriteEffects.None, 0f);
@@ -505,6 +675,12 @@ namespace WindowsGame1
                             (goc[a].full.Y_pos + (float)goc[a].full.Asset.Width * scale / 10) > Math.Min(i1.Y, i2.Y + i2.Y - i1.Y) &&
                             (goc[a].full.Y_pos - (float)goc[a].full.Asset.Width * scale / 10) < Math.Max(i1.Y, i2.Y + i2.Y - i1.Y))
                         {
+                            //soundEngineInstance.Volume = 0.75f;
+                            if (Settings1.Default.enableSounds)
+                            {
+                                soundEngineInstance.Play();
+                            }
+                            scorePoint += 5; // // Meskerem: Update game score here
                             BeginHalfs(goc[a]);
                             goc[a].full = null;
                         }
@@ -535,13 +711,19 @@ namespace WindowsGame1
             oc.half1.Y_pos = oc.full.Y_pos;
             oc.half1.X_speed = oc.full.X_speed + (float)(rnd.NextDouble()) * rnd.Next(-1, 2) + 2;
             oc.half1.Y_speed = oc.full.Y_speed + (float)(rnd.NextDouble()) * rnd.Next(-1, 2);
-            oc.half1.Radius = oc.full.Radius / 2;
+            oc.half1.Radius = oc.full.Radius;
+            oc.half1.Rotation = oc.full.Rotation;
+            oc.half1.Asset = fruit_halfs1[Array.IndexOf(fruits, oc.full.Asset)];
             oc.half2 = new GameObject(resolutionXtotal, resolutionYtotal, rnd, null);
             oc.half2.X_pos = oc.full.X_pos;
             oc.half2.Y_pos = oc.full.Y_pos;
             oc.half2.X_speed = oc.full.X_speed + (float)(rnd.NextDouble()) * rnd.Next(-1, 2) - 2;
             oc.half2.Y_speed = oc.full.Y_speed + (float)(rnd.NextDouble()) * rnd.Next(-1, 2);
-            oc.half2.Radius = oc.full.Radius / 2;
+            oc.half2.Radius = oc.full.Radius;
+            oc.half2.Rotation = oc.full.Rotation;
+            oc.half2.Asset = fruit_halfs2[Array.IndexOf(fruits, oc.full.Asset)];
+            //Console.WriteLine(Array.IndexOf(fruits, oc.full.Asset));
+            //Console.WriteLine(fruit_halfs2);
             GC.Collect();
         }
 
@@ -562,7 +744,7 @@ namespace WindowsGame1
             numGameObjects = rnd.Next(1, maxNumGameObjects + 1);
             for (int i = 0; i < numGameObjects; i++)
             {
-                goc[i] = new GameObjectCollection(resolutionXtotal, resolutionYtotal, rnd, fruits[rnd.Next(0, 6)]);
+                goc[i] = new GameObjectCollection(resolutionXtotal, resolutionYtotal, rnd, fruits[rnd.Next(0, 5)]);
             }
             GC.Collect();
         }
